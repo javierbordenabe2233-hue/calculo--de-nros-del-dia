@@ -12,6 +12,7 @@
 <title>Números del día · Paso San Sebastián</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 :root{--navy:#1f2a44;--navy2:#2c3a5c;--red:#c62828;--red-soft:#fdecea;--bg:#f3f4f7;--line:#d5d9e2;--ink:#1b1f29;--mute:#6b7385;--ok:#2e7d32;--warn:#b26a00}
 *{box-sizing:border-box}
@@ -89,17 +90,18 @@ pre{white-space:pre-wrap;background:#f6f7f9;border:1px solid var(--line);border-
     <div class="grid2">
       <div data-side="e">
         <span class="side-title t-e">ENTRADA</span>
-        <label class="drop" id="drop-e"><input type="file" accept="image/*" hidden id="file-e"><span class="lbl">Subir foto de ENTRADA</span><span class="hint">Foto o captura de pantalla · tocá, arrastrá o pegá con Ctrl+V</span></label>
+        <label class="drop" id="drop-e"><input type="file" accept="image/*,.docx" hidden id="file-e"><span class="lbl">Subir foto de ENTRADA</span><span class="hint">Foto o captura de pantalla · tocá, arrastrá o pegá con Ctrl+V</span></label>
         <button class="sec" data-paste="e" style="margin-top:6px;font-size:13px;padding:5px 10px">📋 Pegar captura de entrada</button>
         <div class="status" id="st-e"></div>
       </div>
       <div data-side="s">
         <span class="side-title t-s">SALIDA</span>
-        <label class="drop" id="drop-s"><input type="file" accept="image/*" hidden id="file-s"><span class="lbl">Subir foto de SALIDA</span><span class="hint">Foto o captura de pantalla · tocá, arrastrá o pegá con Ctrl+V</span></label>
+        <label class="drop" id="drop-s"><input type="file" accept="image/*,.docx" hidden id="file-s"><span class="lbl">Subir foto de SALIDA</span><span class="hint">Foto o captura de pantalla · tocá, arrastrá o pegá con Ctrl+V</span></label>
         <button class="sec" data-paste="s" style="margin-top:6px;font-size:13px;padding:5px 10px">📋 Pegar captura de salida</button>
         <div class="status" id="st-s"></div>
       </div>
     </div>
+    <div class="row" style="margin-top:12px"><label class="sec" style="display:inline-block;cursor:pointer;border:1px solid var(--navy);border-radius:8px;padding:8px 14px;font-weight:600;color:var(--navy);background:#fff">📄 Cargar Word con las 2 capturas<input type="file" accept=".docx" hidden id="fileDocx"></label><span class="status" id="stDocx" style="margin:0"></span></div>
     <p class="note" id="ocrNote">Al subir cada foto, la app lee la columna verde <b>A (Aceptados)</b> y completa la tabla de abajo. Revisá siempre los números: podés corregirlos a mano.</p>
 
     <details id="apiBox" style="margin-top:10px;font-size:13px"><summary style="cursor:pointer;font-weight:600">Lectura de fotos (clave de API)</summary>
@@ -369,6 +371,7 @@ Para cada fila según su Etiqueta:
 Si una fila no aparece, poné 0. Indicá también qué casilla está tildada arriba: "entrada", "salida" o "entrada-salida".
 Respondé únicamente con JSON, sin texto extra: {"modo":"...","sin":0,"t7":0,"t27":0,"tdc":0,"tdp":0}`;
 async function handleFile(side,file){
+  if(esDocx(file))return cargarDocx(file,side);
   if(!file||!file.type.startsWith('image/'))return;
   const st=$('st-'+side);st.className='status';st.textContent='Preparando imagen…';
   let shr;try{shr=await shrink(file);}catch(e){st.className='status err';st.textContent='No pude abrir la imagen.';return;}
@@ -651,6 +654,35 @@ document.addEventListener('paste',e=>{
   if(!f)return;e.preventDefault();
   const sd=pasteSide||(S.e.sin===''?'e':'s');handleFile(sd,f);pasteSide=null;
 });
+
+/* ---- Word (.docx) con capturas ---- */
+async function imagenesDocx(file){
+  if(!window.JSZip)throw new Error('no cargó el lector de Word; revisá la conexión');
+  const zip=await JSZip.loadAsync(file);
+  const doc=await zip.file('word/document.xml')?.async('string');const rels=await zip.file('word/_rels/document.xml.rels')?.async('string');
+  if(!doc||!rels)throw new Error('el archivo no parece un Word (.docx)');
+  const map={};rels.replace(/<Relationship\b[^>]*>/g,t=>{const id=(t.match(/Id="([^"]+)"/)||[])[1],tg=(t.match(/Target="([^"]+)"/)||[])[1];if(id&&tg)map[id]=tg;});
+  const ids=[...doc.matchAll(/r:(?:embed|id)="([^"]+)"/g)].map(m=>m[1]).filter((v,i,a)=>a.indexOf(v)===i);
+  const out=[];
+  for(const id of ids){const t=map[id];if(!t||!/\.(png|jpe?g|gif|bmp)$/i.test(t))continue;
+    const path=t.startsWith('/')?t.slice(1):'word/'+t.replace(/^\.\//,'');const f=zip.file(path);if(!f)continue;
+    const ext=t.split('.').pop().toLowerCase();const type=ext==='jpg'?'image/jpeg':'image/'+ext;
+    out.push(new File([await f.async('blob')],'captura.'+ext,{type}));}
+  return out;
+}
+async function cargarDocx(file,sideHint){
+  const st=$('stDocx');st.className='status';st.textContent='Abriendo el Word…';
+  try{
+    const imgs=await imagenesDocx(file);
+    if(!imgs.length)throw new Error('no encontré imágenes en el Word (pegá las capturas como imagen)');
+    if(sideHint&&imgs.length===1){st.textContent='';return handleFile(sideHint,imgs[0]);}
+    if(imgs.length===1){st.className='status err';st.textContent='El Word tiene una sola imagen: la cargué como ENTRADA. Si era la salida, subilo desde el recuadro de SALIDA.';return handleFile('e',imgs[0]);}
+    st.className='status ok';st.textContent='✓ '+imgs.length+' imágenes: la 1ª va a ENTRADA y la 2ª a SALIDA.'+(imgs.length>2?' (Las demás no se usan.)':'');
+    await handleFile('e',imgs[0]);await handleFile('s',imgs[1]);
+  }catch(e){st.className='status err';st.textContent='No pude usar el Word: '+e.message+'.';}
+}
+const esDocx=f=>f&&(/\.docx$/i.test(f.name)||f.type==='application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+$('fileDocx').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)cargarDocx(f);};
 
 buildSicam();buildVeh();buildBus();
 </script>
