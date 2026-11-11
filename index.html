@@ -401,51 +401,81 @@ async function handleFile(side,file){
 
 
 /* ---- Lectura local gratis (capturas de pantalla) ---- */
-let tessLoad=null;
+let tessLoad=null,tessWorker=null,tessLog=()=>{};
 function loadTess(){
   if(window.Tesseract)return Promise.resolve();
-  if(!tessLoad)tessLoad=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=res;s.onerror=()=>{tessLoad=null;rej(new Error('no se pudo cargar el lector; revisá la conexión'));};document.head.append(s);});
+  if(!tessLoad)tessLoad=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';s.onload=res;s.onerror=()=>{tessLoad=null;rej(new Error('no se pudo cargar el lector; revisá la conexión'));};document.head.append(s);});
   return tessLoad;
 }
-function prepOcr(blob){
-  return new Promise((res,rej)=>{const img=new Image();img.onload=()=>{
-    const sc=Math.min(3,Math.max(1.5,2400/img.width));const c=document.createElement('canvas');c.width=img.width*sc;c.height=img.height*sc;
-    const x=c.getContext('2d');x.imageSmoothingQuality='high';x.filter='grayscale(1) contrast(1.4)';x.drawImage(img,0,0,c.width,c.height);res(c);};
-    img.onerror=rej;img.src=URL.createObjectURL(blob);});
+async function getWorker(){
+  await loadTess();
+  if(!tessWorker)tessWorker=await Tesseract.createWorker('eng',1,{logger:m=>tessLog(m)});
+  return tessWorker;
 }
-function despues(L,re){const m=L.match(re);if(!m)return[];return (L.slice(m.index+m[0].length).match(/\d+/g)||[]).map(Number);}
-// Une dígitos que el lector separó dentro de una misma celda (ej. "1 1" -> "11")
-function textoDeLineas(data){
-  if(!data.lines||!data.lines.length)return data.text||'';
-  return data.lines.map(l=>{
-    let s='',prev=null;
-    (l.words||[]).forEach(w=>{
-      const t=(w.text||'').replace(/[|]/g,'').trim();if(!t){prev=null;return;}
-      const alto=(w.bbox.y1-w.bbox.y0)||10;
-      if(prev&&/^\d+$/.test(t)&&/^\d+$/.test(prev.t)&&(w.bbox.x0-prev.x1)<alto*0.6)s+=t;
-      else s+=(s?' ':'')+t;
-      prev={t,x1:w.bbox.x1};
-    });
-    return s;
-  }).join('\n');
+function loadImg(blob){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('no pude abrir la imagen'));i.src=URL.createObjectURL(blob);});}
+function recorte(img,x,y,w,h,sc){
+  const c=document.createElement('canvas');c.width=Math.round(w*sc);c.height=Math.round(h*sc);
+  const k=c.getContext('2d');k.imageSmoothingQuality='high';k.fillStyle='#fff';k.fillRect(0,0,c.width,c.height);
+  k.filter='grayscale(1) contrast(1.4)';k.drawImage(img,x,y,w,h,0,0,c.width,c.height);return c;
 }
-// Total = A + D + S + R + C (+ otras): si no cierra, la fila es dudosa
+async function leer(canvas,psm){
+  const w=await getWorker();await w.setParameters({tessedit_pageseg_mode:String(psm)});
+  const r=await w.recognize(canvas,{},{text:true,tsv:true});
+  return palabrasTsv(r.data.tsv||'');
+}
+function palabrasTsv(tsv){
+  return tsv.split('\n').map(l=>l.split('\t')).filter(c=>c[0]==='5'&&c[11]&&c[11].trim())
+    .map(c=>({line:c[2]+'.'+c[3]+'.'+c[4],x0:+c[6],y0:+c[7],x1:+c[6]+ +c[8],y1:+c[7]+ +c[9],t:c[11].trim()}));
+}
+// Arma el texto de cada renglón uniendo dígitos que el lector separó dentro de una celda ("1 1" -> "11")
+function lineasTexto(words){
+  const g={};words.forEach(w=>{(g[w.line]=g[w.line]||[]).push(w);});
+  return Object.values(g).map(ws=>{
+    ws.sort((a,b)=>a.x0-b.x0);let s='',prev=null;
+    ws.forEach(w=>{const t=w.t.replace(/[|]/g,'');if(!t){prev=null;return;}
+      const alto=(w.y1-w.y0)||10;
+      if(prev&&/^\d+$/.test(t)&&/^\d+$/.test(prev.t)&&(w.x0-prev.x1)<alto*0.6)s+=t;else s+=(s?' ':'')+t;
+      prev={t,x1:w.x1};});
+    return s;}).join('\n');
+}
+// Busca los títulos Compania / Etiqueta / Total de la tabla del S.I.Ca.M.
+function buscarEncabezado(words){
+  for(const C of words.filter(w=>/^compa/i.test(w.t))){
+    const h=C.y1-C.y0;const misma=w=>Math.abs(w.y0-C.y0)<h&&w.x0>C.x0;
+    const E=words.find(w=>/^etiq/i.test(w.t)&&misma(w)),T=words.find(w=>/^total/i.test(w.t)&&misma(w));
+    if(E&&T&&T.x0>E.x0)return {C,E,T,h};
+  }
+  return null;
+}
+// Números que siguen a la etiqueta; corrige confusiones típicas del lector (g→9, ?→7, O→0, l→1…)
+const CONF={G:'9',Q:'9','?':'7',O:'0',D:'0',I:'1',L:'1','!':'1',Z:'2',S:'5',B:'8',T:'7'};
+function despues(L,re){const m=L.match(re);if(!m)return[];
+  return L.slice(m.index+m[0].length).split(/\s+/).map(t=>t.replace(/[.,;:'"`*_-]/g,'')).filter(Boolean)
+    .map(t=>/\d/.test(t)||(t.length<=2&&/^[GQ?OIL!ZSBT]+$/.test(t))?t.split('').map(ch=>CONF[ch]||ch).join(''):null)
+    .filter(t=>t&&/^\d+$/.test(t)).map(Number);}
+// Total = A + D + S + R + C: si no cierra, la fila es dudosa
 const cierra=n=>n.length>=2&&n[0]===n.slice(1).reduce((a,b)=>a+b,0);
 function parseOcr(text){
   const out={},dud=[],taa=[];
   text.split('\n').forEach(raw=>{
-    const L=raw.toUpperCase().replace(/[|\[\]{}()]/g,' ');
+    const L=raw.toUpperCase().replace(/[|\[\]{}(),]/g,' ');
     let n;
     const set=(k,arr)=>{out[k]=arr[1];if(!cierra(arr))dud.push(k);};
-    if(/PARTICULAR/.test(L)&&(n=despues(L,/\bS[I1L]N\b/)).length>=2){set('sin',n);return;}
-    if(/CARGA/.test(L)&&(n=despues(L,/\bT[DO0]C\b/)).length>=2){set('tdc',n);return;}
-    if(/PASAJ/.test(L)&&(n=despues(L,/\bT[DO0]P\b/)).length>=2){set('tdp',n);return;}
-    if(/TRANSIT|ARGENT/.test(L)&&(n=despues(L,/ARGENT[A-Z]*(?!.*ARGENT)/)).length>=3)taa.push(n);
+    if(/PARTICULAR/.test(L)&&(n=despues(L,/S[I1L]N\b/)).length>=2){set('sin',n);return;}
+    if(/CARGA/.test(L)&&(n=despues(L,/T[DO0]C\b/)).length>=2){set('tdc',n);return;}
+    if(/PASAJ/.test(L)&&(n=despues(L,/T[DO0]P\b/)).length>=2){set('tdp',n);return;}
+    if(/TRANSIT|ARGENT/.test(L)&&(n=despues(L,/ARGENT[A-Z]*(?!.*ARGENT)/)).length>=2)taa.push(n);
   });
-  taa.forEach((n,i)=>{const k=n[0]===27?'t27':n[0]===7?'t7':(i===0?'t7':'t27');out[k]=n[2];if(!cierra(n.slice(1)))dud.push(k);});
+  taa.slice(0,2).forEach((n,i)=>{
+    let tag=null,vals=n;
+    if(n.length>=3&&cierra(n.slice(1))){tag=n[0];vals=n.slice(1);}       // se leyó la etiqueta (7 / 27)
+    else if(!cierra(n)&&n.length>=3){tag=n[0];vals=n.slice(1);}
+    const k=tag===27?'t27':tag===7?'t7':(i===0?'t7':'t27');
+    if(out[k]!==undefined)return;
+    out[k]=vals[1];if(!cierra(vals))dud.push(k);
+  });
   out._dud=dud;return out;
 }
-
 function marcarDudosos(side,keys){
   document.querySelectorAll(`input.n[data-side="${side}"]`).forEach(i=>{
     const bad=keys.includes(i.dataset.key);i.style.background=bad?'#fff4e0':'';i.style.borderColor=bad?'var(--warn)':'';
@@ -455,16 +485,32 @@ function marcarDudosos(side,keys){
 async function ocrLocal(side,blob,st){
   try{
     st.className='status';st.textContent='Cargando lector (la primera vez tarda unos segundos)…';
-    await loadTess();const canvas=await prepOcr(blob);
-    const r=await Tesseract.recognize(canvas,'eng',{tessedit_pageseg_mode:'6',logger:m=>{if(m.status==='recognizing text')st.textContent='Leyendo la captura… '+Math.round(m.progress*100)+'%';}});
-    const d=parseOcr(textoDeLineas(r.data));const keys=['sin','t7','t27','tdc','tdp'];const got=keys.filter(k=>d[k]!==undefined);
+    const img=await loadImg(blob);
+    tessLog=m=>{if(m.status==='recognizing text')st.textContent='Buscando la tabla… '+Math.round(m.progress*100)+'%';};
+    await getWorker();
+    // 1) Buscar la tabla del S.I.Ca.M. en toda la captura
+    const s1=Math.max(1,Math.min(2,3200/img.width));
+    const todo=(await leer(recorte(img,0,0,img.width,img.height,s1),11)).map(w=>({...w,x0:w.x0/s1,x1:w.x1/s1,y0:w.y0/s1,y1:w.y1/s1}));
+    const H=buscarEncabezado(todo);
+    let texto;
+    tessLog=m=>{if(m.status==='recognizing text')st.textContent='Leyendo números… '+Math.round(m.progress*100)+'%';};
+    if(H){
+      // 2) Leer solo la tabla (Compania, Etiqueta, Total y la columna verde A)
+      const x=Math.max(0,H.C.x0-(H.E.x0-H.C.x0)),y=Math.max(0,H.C.y0-H.h*0.5);
+      const r=Math.min(img.width,H.T.x0+2.2*(H.T.x0-H.E.x0)),b=Math.min(img.height,H.C.y1+H.h*20);
+      const sc=Math.max(2,Math.min(4,1600/(r-x)));
+      texto=lineasTexto(await leer(recorte(img,x,y,r-x,b-y,sc),6));
+    }else{
+      texto=lineasTexto(await leer(recorte(img,0,0,img.width,img.height,s1),6));
+    }
+    const d=parseOcr(texto);const keys=['sin','t7','t27','tdc','tdp'];const got=keys.filter(k=>d[k]!==undefined);
     if(!got.length)throw new Error('no encontré la tabla');
     got.forEach(k=>S[side][k]=String(d[k]));save();refreshInputs();recalc();
     const nom={sin:'SIN',t7:'7',t27:'27',tdc:'TDC',tdp:'TDP'};const falt=keys.filter(k=>d[k]===undefined).map(k=>nom[k]);
     const dud=(d._dud||[]).filter(k=>d[k]!==undefined).map(k=>nom[k]);
     marcarDudosos(side,d._dud||[]);
     st.className=(falt.length||dud.length)?'status err':'status ok';
-    st.textContent=(dud.length?'⚠ Revisá '+dud.join(', ')+': en esa fila el Total no coincide con la suma de las columnas, puede estar mal leído. ':'')+(falt.length?'⚠ Leí parte de la captura; faltan: '+falt.join(', ')+'. Completalos a mano. ':'✓ Leído (columna A verde): '+keys.map(k=>nom[k]+' '+d[k]).join(' · ')+'. ')+'Revisá que coincida.';
+    st.textContent=(dud.length?'⚠ Revisá '+dud.join(', ')+': el Total no coincide con la columna A, puede estar mal leído. ':'')+(falt.length?'⚠ Faltan: '+falt.join(', ')+'. Completalos a mano. ':'')+'Leído (columna A verde): '+got.map(k=>nom[k]+' '+d[k]).join(' · ')+'. Revisá que coincida.';
   }catch(e){st.className='status err';st.textContent='No pude leer la imagen ('+e.message+'). Este lector gratis funciona con capturas de pantalla, no con fotos del monitor. Para fotos cargá la clave de API en "Lectura de fotos", o cargá los números a mano.';}
 }
 
