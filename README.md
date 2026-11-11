@@ -7,7 +7,7 @@ App web (una sola página, `index.html`) para armar los números diarios del Pas
 2. Carga manual de vehículos: autos, camiones argentinos, camiones chilenos y caminantes.
 3. Colectivos de Chile y de Argentina, de entrada y de salida, con pasajeros y tripulantes de cada uno.
 4. Cuadro de ingresos/egresos (pasajeros, tripulantes, vehículos) y total de personas del día.
-5. Grilla para Gendarmería, que se descarga como imagen o se copia como texto.
+5. Grilla para Gendarmería, que se descarga en PDF (A4, lista para imprimir) o se copia como texto.
 6. Planilla estadístico mensual, que se descarga como Excel (.xlsx) o se copia como columna para pegar en el Excel mensual.
 
 ## Lectura de imágenes
