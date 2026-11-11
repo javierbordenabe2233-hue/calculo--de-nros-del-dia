@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Números del día · Paso San Sebastián</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<style>
+:root{--navy:#1f2a44;--navy2:#2c3a5c;--red:#c62828;--red-soft:#fdecea;--bg:#f3f4f7;--line:#d5d9e2;--ink:#1b1f29;--mute:#6b7385;--ok:#2e7d32;--warn:#b26a00}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px}
+header{background:var(--navy);color:#fff;padding:16px 18px}
+header h1{margin:0;font-size:19px;letter-spacing:.3px}
+header .sub{display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap;font-size:13px;opacity:.95}
+header input{font:inherit;padding:4px 8px;border-radius:6px;border:0}
+main{max-width:980px;margin:0 auto;padding:14px}
+.card{background:#fff;border:1px solid var(--line);border-radius:10px;margin-bottom:14px;overflow:hidden}
+.card>h2{margin:0;background:var(--navy2);color:#fff;font-size:15px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center}
+.card>h2 small{font-weight:400;opacity:.8;font-size:12px}
+.body{padding:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:700px){.grid2{grid-template-columns:1fr}}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:10px;text-align:center;cursor:pointer;background:#fafbfc;min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;position:relative}
+.drop img{max-width:100%;max-height:170px;border-radius:6px}
+.drop .lbl{font-weight:700}
+.drop .hint{font-size:12px;color:var(--mute)}
+.side-title{font-weight:800;font-size:13px;letter-spacing:.5px;padding:4px 10px;border-radius:5px;display:inline-block;margin-bottom:8px;color:#fff}
+.t-e{background:var(--ok)}.t-s{background:var(--red)}
+table{border-collapse:collapse;width:100%}
+td,th{border:1px solid var(--line);padding:6px 8px;text-align:center}
+th{background:var(--navy);color:#fff;font-size:12px;font-weight:700}
+td.l{text-align:left;font-weight:600;background:#f0f2f6}
+input.n{width:100%;max-width:90px;font:inherit;font-weight:700;text-align:center;padding:6px 4px;border:1px solid var(--line);border-radius:6px}
+input.n:focus{outline:2px solid #5b7bd5;border-color:transparent}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--navy);background:var(--navy);color:#fff;padding:8px 14px;font-weight:600}
+button.sec{background:#fff;color:var(--navy)}
+button.red{background:var(--red);border-color:var(--red)}
+button:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.status{font-size:13px;color:var(--mute);margin-top:6px;min-height:18px}
+.status.err{color:var(--red)}.status.ok{color:var(--ok)}
+.tabs{display:flex;gap:6px;margin-bottom:12px}
+.tab{background:#e7eaf0;color:var(--navy);border:0}
+.tab.on.e{background:var(--ok);color:#fff}.tab.on.s{background:var(--red);color:#fff}
+.busgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:700px){.busgrid{grid-template-columns:1fr}}
+.bushead{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.bushead b{font-size:13px}
+.cnt{display:flex;align-items:center;gap:6px;font-size:13px}
+.cnt input{width:60px}
+.foot td{background:var(--red);color:#fff;font-weight:800}
+.check{margin-top:10px;padding:8px 10px;border-radius:8px;font-size:13px}
+.check.ok{background:#e8f5e9;color:var(--ok)}.check.bad{background:#fff4e0;color:var(--warn)}
+.res td{font-weight:700;color:#7a1414;background:var(--red-soft);font-size:16px}
+.res td.l{color:var(--ink);background:#f0f2f6;font-size:14px}
+.res tr.tot td{background:var(--red);color:#fff}
+#gend{background:#fff}
+#gend .gh{background:var(--navy);color:#fff;text-align:center;padding:14px 10px}
+#gend .gh b{font-size:18px;display:block}
+#gend .gh span{font-size:12px;opacity:.9}
+#gend .gb{padding:16px}
+#gend .gf{text-align:center;font-size:11px;color:var(--mute);padding:0 0 12px}
+.note{font-size:12px;color:var(--mute);margin-top:8px;line-height:1.45}
+.mini td,.mini th{padding:5px 6px;font-size:13px}
+.three{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:700px){.three{grid-template-columns:1fr}}
+pre{white-space:pre-wrap;background:#f6f7f9;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:13px;margin:10px 0 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>Números del día · Paso San Sebastián</h1>
+  <div class="sub">Fecha <input type="date" id="fecha"> <button class="sec" id="btnReset" style="padding:4px 10px;font-size:13px">Nuevo día (borrar)</button></div>
+</header>
+<main>
+
+<!-- 1. FOTOS -->
+<section class="card">
+  <h2>1 · Fotos del S.I.Ca.M. <small>Administración de tránsitos → Compañías</small></h2>
+  <div class="body">
+    <div class="grid2">
+      <div data-side="e">
+        <span class="side-title t-e">ENTRADA</span>
+        <label class="drop" id="drop-e"><input type="file" accept="image/*" hidden id="file-e"><span class="lbl">Subir foto de ENTRADA</span><span class="hint">Tocá para elegir o arrastrá la imagen</span></label>
+        <div class="status" id="st-e"></div>
+      </div>
+      <div data-side="s">
+        <span class="side-title t-s">SALIDA</span>
+        <label class="drop" id="drop-s"><input type="file" accept="image/*" hidden id="file-s"><span class="lbl">Subir foto de SALIDA</span><span class="hint">Tocá para elegir o arrastrá la imagen</span></label>
+        <div class="status" id="st-s"></div>
+      </div>
+    </div>
+    <p class="note" id="ocrNote">Al subir cada foto, la app lee la columna verde <b>A (Aceptados)</b> y completa la tabla de abajo. Revisá siempre los números: podés corregirlos a mano.</p>
+
+    <details id="apiBox" style="margin-top:10px;font-size:13px"><summary style="cursor:pointer;font-weight:600">Lectura de fotos (clave de API)</summary>
+      <p class="note">En esta versión las fotos se leen con una clave de API de Anthropic (console.anthropic.com). La clave queda guardada solo en este navegador, no en GitHub. Cada lectura usa crédito de esa cuenta.</p>
+      <div class="row"><input type="password" id="apiKey" placeholder="sk-ant-..." style="flex:1;min-width:200px;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px"><button class="sec" id="apiSave">Guardar</button><button class="sec" id="apiDel">Borrar</button></div>
+      <div class="status" id="apiSt"></div>
+    </details>
+    <table class="mini" style="margin-top:8px">
+      <thead><tr><th style="text-align:left">Compañía (etiqueta)</th><th>Entrada</th><th>Salida</th><th>Va a</th></tr></thead>
+      <tbody id="sicamBody"></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 2. VEHÍCULOS -->
+<section class="card">
+  <h2>2 · Vehículos y caminantes <small>carga manual</small></h2>
+  <div class="body">
+    <table class="mini">
+      <thead><tr><th style="text-align:left">Concepto</th><th>Entrada</th><th>Salida</th></tr></thead>
+      <tbody id="vehBody"></tbody>
+    </table>
+    <p class="note">Camiones chilenos: si lo dejás vacío se toma la misma cantidad que personas de TDC (1 chofer por camión). Los colectivos se cuentan solos desde la solapa de abajo.</p>
+  </div>
+</section>
+
+<!-- 3. COLECTIVOS -->
+<section class="card">
+  <h2>3 · Colectivos <small>pasajeros y tripulantes de cada uno</small></h2>
+  <div class="body">
+    <div class="tabs"><button class="tab e on" data-tab="e">Entrada</button><button class="tab s" data-tab="s">Salida</button></div>
+    <div class="busgrid" id="busArea"></div>
+    <div id="busCheck"></div>
+  </div>
+</section>
+
+<!-- 4. RESULTADOS -->
+<section class="card">
+  <h2>4 · Ingresos, egresos y totales</h2>
+  <div class="body">
+    <div class="grid2">
+      <div><div class="side-title" style="background:var(--navy)">INGRESOS Y EGRESOS</div><table class="res" id="ieTable"></table></div>
+      <div><div class="side-title" style="background:var(--red)">TOTAL DE PERSONAS · PLANILLA DIARIA</div><table class="res" id="totTable"></table></div>
+    </div>
+    <div class="three" style="margin-top:14px" id="detalle"></div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>5 · Grilla para Gendarmería</h2>
+  <div class="body">
+    <div id="gend">
+      <div class="gh"><b>NÚMEROS PARA GENDARMERÍA</b><span id="gendSub"></span></div>
+      <div class="gb"><table class="res" id="gendTable"></table></div>
+      <div class="gf">Migraciones · Delegación Tierra del Fuego · Fuente: S.I.Ca.M.</div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="red" id="btnPng">Descargar imagen de la grilla</button>
+      <button class="sec" id="btnCopy">Copiar texto (WhatsApp)</button>
+    </div>
+    <div class="status" id="stOut"></div>
+    <pre id="txtOut" hidden></pre>
+  </div>
+</section>
+
+<section class="card">
+  <h2>6 · Planilla estadístico mensual <small>Excel para enviar por correo</small></h2>
+  <div class="body">
+    <div class="row" style="margin-bottom:10px;font-size:13px">
+      Tasa por camión chileno (TDC) $ <input type="number" class="n" id="tasaTdc" style="max-width:100px">
+      &nbsp; Tasa por colectivo chileno $ <input type="number" class="n" id="tasaBus" style="max-width:100px">
+    </div>
+    <table class="mini" id="planTable"></table>
+    <div class="row" style="margin-top:12px">
+      <button class="red" id="btnXlsx">Descargar Excel</button>
+      <button class="sec" id="btnCol">Copiar columna del día</button>
+    </div>
+    <div class="status" id="stPlan"></div>
+    <p class="note">"Copiar columna del día" copia los 29 valores (desde la fecha hasta la última tasa) en una sola columna: en tu Excel mensual hacé clic en la celda de la fecha (fila 1) de la columna del día y pegá.</p>
+  </div>
+</section>
+
+</main>
+<script>
+const SICAM_ROWS=[
+  {k:'sin',name:'PARTICULAR',tag:'SIN',to:'AUTO'},
+  {k:'t7',name:'TRÁNSITO ARGENTINA',tag:'7',to:'CAMIÓN'},
+  {k:'t27',name:'TRÁNSITO ARGENTINA',tag:'27',to:'BUS'},
+  {k:'tdc',name:'TRANSPORTE DE CARGA',tag:'TDC',to:'CAMIÓN'},
+  {k:'tdp',name:'TRANSPORTE DE PASAJEROS',tag:'TDP',to:'BUS'}
+];
+const VEH_ROWS=[
+  {k:'autos',name:'Autos particulares (vehículos)'},
+  {k:'camArg',name:'Camiones argentinos (vehículos)'},
+  {k:'camChi',name:'Camiones chilenos (vehículos)'},
+  {k:'cami',name:'Caminantes (personas → OTROS)'}
+];
+function hoy(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+const blankSide=()=>({sin:'',t7:'',t27:'',tdc:'',tdp:'',autos:'',camArg:'',camChi:'',cami:'',bus:{chi:[],arg:[]}});
+let S={fecha:hoy(),e:blankSide(),s:blankSide()};
+let tab='e';
+const KEY='numeros-dia-ss-v1';
+try{const d=JSON.parse(localStorage.getItem(KEY)||'null');if(d&&d.e&&d.s)S=d;}catch(e){}
+if(!S.fecha||S.fecha>hoy())S.fecha=hoy();
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const num=v=>{const n=parseInt(v,10);return isNaN(n)?0:n};
+const $=id=>document.getElementById(id);
+
+function numInput(side,key,ph){
+  const i=document.createElement('input');i.type='number';i.inputMode='numeric';i.min=0;i.className='n';
+  i.value=S[side][key];if(ph!==undefined)i.placeholder=ph;
+  i.oninput=()=>{S[side][key]=i.value;save();recalc();};
+  i.dataset.side=side;i.dataset.key=key;
+  return i;
+}
+function buildSicam(){
+  const tb=$('sicamBody');tb.innerHTML='';
+  SICAM_ROWS.forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="l">${r.name} <span style="color:var(--mute);font-weight:400">(${r.tag})</span></td><td></td><td></td><td style="font-size:12px;color:var(--mute)">${r.to}</td>`;
+    tr.children[1].append(numInput('e',r.k));tr.children[2].append(numInput('s',r.k));
+    tb.append(tr);
+  });
+}
+function buildVeh(){
+  const tb=$('vehBody');tb.innerHTML='';
+  VEH_ROWS.forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="l">${r.name}</td><td></td><td></td>`;
+    tr.children[1].append(numInput('e',r.k));tr.children[2].append(numInput('s',r.k));
+    tb.append(tr);
+  });
+}
+function refreshInputs(){document.querySelectorAll('input.n[data-key]').forEach(i=>{i.value=S[i.dataset.side][i.dataset.key];});}
+
+/* ---- Colectivos ---- */
+function buildBus(){
+  const area=$('busArea');area.innerHTML='';
+  [['chi','COLECTIVOS CHILE'],['arg','COLECTIVOS ARG']].forEach(([o,title])=>{
+    const list=S[tab].bus[o];
+    const box=document.createElement('div');
+    const head=document.createElement('div');head.className='bushead';
+    head.innerHTML=`<b>${title}</b>`;
+    const c=document.createElement('label');c.className='cnt';c.textContent='¿Cuántos? ';
+    const ci=document.createElement('input');ci.type='number';ci.min=0;ci.max=60;ci.className='n';ci.inputMode='numeric';ci.value=list.length||'';
+    ci.onchange=()=>{let n=Math.max(0,Math.min(60,num(ci.value)));while(list.length<n)list.push({p:'',t:''});list.length=n;save();buildBus();recalc();};
+    c.append(ci);head.append(c);box.append(head);
+    const t=document.createElement('table');t.className='mini';
+    t.innerHTML=`<thead><tr><th>#</th><th>Pasajeros</th><th>Tripulantes</th></tr></thead>`;
+    const tb=document.createElement('tbody');
+    list.forEach((b,ix)=>{
+      const tr=document.createElement('tr');tr.innerHTML=`<td>${ix+1}</td><td></td><td></td>`;
+      ['p','t'].forEach((f,j)=>{const i=document.createElement('input');i.type='number';i.min=0;i.className='n';i.inputMode='numeric';i.value=b[f];
+        i.oninput=()=>{b[f]=i.value;save();recalc();};tr.children[j+1].append(i);});
+      tb.append(tr);
+    });
+    if(!list.length){const tr=document.createElement('tr');tr.innerHTML=`<td colspan="3" style="color:var(--mute);font-size:13px">Sin colectivos</td>`;tb.append(tr);}
+    t.append(tb);
+    const tf=document.createElement('tfoot');tf.className='foot';tf.id='foot-'+o;t.append(tf);
+    box.append(t);area.append(box);
+  });
+  recalc();
+}
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));buildBus();});
+
+/* ---- Cálculo ---- */
+function calc(side){
+  const x=S[side];
+  const busSum=o=>x.bus[o].reduce((a,b)=>({n:a.n+1,p:a.p+num(b.p),t:a.t+num(b.t)}),{n:0,p:0,t:0});
+  const chi=busSum('chi'),arg=busSum('arg');
+  const pAuto=num(x.sin),pBus=num(x.t27)+num(x.tdp),pCam=num(x.t7)+num(x.tdc),pOtros=num(x.cami);
+  const total=pAuto+pBus+pCam+pOtros;
+  const busTrip=chi.t+arg.t,busPax=chi.p+arg.p,busN=chi.n+arg.n;
+  const trip=pCam+busTrip;
+  const camChi=x.camChi===''?num(x.tdc):num(x.camChi);
+  const vAuto=num(x.autos),vBus=busN,vCam=num(x.camArg)+camChi;
+  return {chi,arg,pAuto,pBus,pCam,pOtros,total,busTrip,busPax,busN,trip,pax:total-trip,
+    vAuto,vBus,vCam,vTot:vAuto+vBus+vCam,camChi,camArgP:num(x.t7),camChiP:num(x.tdc),camArgV:num(x.camArg)};
+}
+function recalc(){
+  const E=calc('e'),Sa=calc('s'),C={e:E,s:Sa};
+  // footers colectivos
+  const cur=C[tab];
+  ['chi','arg'].forEach(o=>{const f=$('foot-'+o);if(f){const v=cur[o];f.innerHTML=`<tr><td>CANT ${v.n}</td><td>PAX ${v.p}</td><td>TRIP ${v.t}</td></tr>`;}});
+  const bc=$('busCheck');
+  const sic=cur.pBus,grid=cur.busPax+cur.busTrip;
+  if(cur.busN===0&&sic===0)bc.innerHTML='';
+  else if(sic===grid)bc.innerHTML=`<div class="check ok">✓ Personas en colectivos (pax + trip) = ${grid}, coincide con S.I.Ca.M. (TDP + TAA 27 = ${sic}).</div>`;
+  else bc.innerHTML=`<div class="check bad">⚠ La grilla suma ${grid} personas (pax ${cur.busPax} + trip ${cur.busTrip}) y el S.I.Ca.M. marca ${sic} en colectivos (TDP + TAA 27). Diferencia: ${grid-sic>0?'+':''}${grid-sic}.</div>`;
+
+  $('ieTable').innerHTML=`
+   <thead><tr><th style="text-align:left"></th><th>INGRESOS</th><th>EGRESOS</th></tr></thead>
+   <tbody>
+    <tr><td class="l">PASAJEROS</td><td>${E.pax}</td><td>${Sa.pax}</td></tr>
+    <tr><td class="l">TRIPULANTES</td><td>${E.trip}</td><td>${Sa.trip}</td></tr>
+    <tr><td class="l">VEHÍCULOS</td><td>${E.vTot}</td><td>${Sa.vTot}</td></tr>
+   </tbody>`;
+  $('totTable').innerHTML=`
+   <thead><tr><th style="text-align:left"></th><th>PERSONAS</th></tr></thead>
+   <tbody>
+    <tr><td class="l">ENTRADA</td><td>${E.total}</td></tr>
+    <tr><td class="l">SALIDA</td><td>${Sa.total}</td></tr>
+    <tr class="tot"><td class="l" style="background:var(--red);color:#fff">TOTAL DEL DÍA</td><td>${E.total+Sa.total}</td></tr>
+   </tbody>`;
+
+  $('detalle').innerHTML=
+   miniBox('CAMIONES ARGENTINOS',[['Entrada',E.camArgP,E.camArgV],['Salida',Sa.camArgP,Sa.camArgV]])+
+   miniBox('CAMIONES CHILENOS',[['Entrada',E.camChiP,E.camChi],['Salida',Sa.camChiP,Sa.camChi]])+
+   miniBox('PARTICULARES',[['Entrada',E.pAuto,E.vAuto],['Salida',Sa.pAuto,Sa.vAuto]])+
+   miniBox('COLECTIVOS CHILE',[['Entrada',E.chi.p+' + '+E.chi.t+' trip',E.chi.n],['Salida',Sa.chi.p+' + '+Sa.chi.t+' trip',Sa.chi.n]])+
+   miniBox('COLECTIVOS ARG',[['Entrada',E.arg.p+' + '+E.arg.t+' trip',E.arg.n],['Salida',Sa.arg.p+' + '+Sa.arg.t+' trip',Sa.arg.n]])+
+   `<div><table class="mini"><thead><tr><th colspan="2">CAMINANTES</th></tr></thead><tbody><tr><td class="l">Entrada</td><td><b>${E.pOtros}</b></td></tr><tr><td class="l">Salida</td><td><b>${Sa.pOtros}</b></td></tr></tbody></table></div>`;
+
+  const b=v=>v===0?'':v;
+  $('gendTable').innerHTML=`
+   <thead><tr><th></th><th colspan="2">VEHÍCULOS</th><th colspan="2">PASAJEROS</th></tr>
+   <tr><th></th><th>ENTRADA</th><th>SALIDA</th><th>ENTRADA</th><th>SALIDA</th></tr></thead>
+   <tbody>
+    <tr><td class="l">AUTO</td><td>${E.vAuto}</td><td>${Sa.vAuto}</td><td>${E.pAuto}</td><td>${Sa.pAuto}</td></tr>
+    <tr><td class="l">BUS</td><td>${E.vBus}</td><td>${Sa.vBus}</td><td>${E.pBus}</td><td>${Sa.pBus}</td></tr>
+    <tr><td class="l">CAMIÓN</td><td>${E.vCam}</td><td>${Sa.vCam}</td><td>${E.pCam}</td><td>${Sa.pCam}</td></tr>
+    <tr><td class="l">OTROS</td><td></td><td></td><td>${b(E.pOtros)}</td><td>${b(Sa.pOtros)}</td></tr>
+    <tr class="tot"><td class="l" style="background:var(--red);color:#fff">TOTAL</td><td>${E.vTot}</td><td>${Sa.vTot}</td><td>${E.total}</td><td>${Sa.total}</td></tr>
+   </tbody>`;
+  $('gendSub').textContent='Paso San Sebastián (Ushuaia) · Fecha: '+fmtFecha(S.fecha);
+  window._C=C;
+}
+function miniBox(title,rows){
+  return `<div><table class="mini"><thead><tr><th colspan="3">${title}</th></tr><tr><th></th><th>Personas</th><th>Vehículos</th></tr></thead><tbody>${
+    rows.map(r=>`<tr><td class="l">${r[0]}</td><td><b>${r[1]}</b></td><td><b>${r[2]}</b></td></tr>`).join('')}</tbody></table></div>`;
+}
+function fmtFecha(f){if(!f)return'';const [y,m,d]=f.split('-');return `${d}/${m}/${y}`;}
+
+/* ---- Fecha / reset ---- */
+$('fecha').value=S.fecha;$('fecha').onchange=e=>{S.fecha=e.target.value;save();recalc();};
+let resetArmed=false;
+$('btnReset').onclick=()=>{
+  if(!resetArmed){resetArmed=true;$('btnReset').textContent='¿Seguro? tocá otra vez';setTimeout(()=>{resetArmed=false;$('btnReset').textContent='Nuevo día (borrar)';},3500);return;}
+  S={fecha:hoy(),e:blankSide(),s:blankSide(),cfg:S.cfg};save();
+  $('fecha').value=S.fecha;resetArmed=false;$('btnReset').textContent='Nuevo día (borrar)';
+  ['e','s'].forEach(sd=>{$('drop-'+sd).querySelectorAll('img').forEach(i=>i.remove());$('st-'+sd).textContent='';});
+  refreshInputs();buildBus();
+};
+
+/* ---- Fotos + lectura ---- */
+let samplePromise=null;
+function getSample(){if(!samplePromise)samplePromise=(window.claude&&claude.use)?claude.use('sample').catch(()=>null):Promise.resolve(null);return samplePromise;}
+function shrink(file){
+  return new Promise((res,rej)=>{
+    const img=new Image();img.onload=()=>{
+      const max=1600,sc=Math.min(1,max/Math.max(img.width,img.height));
+      const c=document.createElement('canvas');c.width=Math.round(img.width*sc);c.height=Math.round(img.height*sc);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      c.toBlob(b=>b?res({blob:b,url:c.toDataURL('image/jpeg',.7)}):rej(new Error('img')),'image/jpeg',.85);
+    };img.onerror=rej;img.src=URL.createObjectURL(file);
+  });
+}
+const PROMPT=`Esta es una foto de la pantalla "Administración de tránsitos" del sistema S.I.Ca.M. (Migraciones Argentina), pestaña "Compañias".
+Hay una tabla con columnas Compania, Etiqueta, Total y luego columnas de color: A (encabezado VERDE = Aceptados), D (rojo), S (amarillo), R (rosa), C (gris)...
+Leé SOLO la columna "A", la de encabezado VERDE (Aceptados). NO uses la columna Total.
+Para cada fila según su Etiqueta:
+- PARTICULAR, etiqueta SIN -> "sin"
+- TRANSITO ARGENTINA ARGENT..., etiqueta 7 -> "t7"
+- TRANSITO ARGENTINA ARGENT..., etiqueta 27 -> "t27"
+- TRANSPORTE DE CARGA, etiqueta TDC -> "tdc"
+- TRANSPORTE DE PASAJEROS, etiqueta TDP -> "tdp"
+Si una fila no aparece, poné 0. Indicá también qué casilla está tildada arriba: "entrada", "salida" o "entrada-salida".
+Respondé únicamente con JSON, sin texto extra: {"modo":"...","sin":0,"t7":0,"t27":0,"tdc":0,"tdp":0}`;
+async function handleFile(side,file){
+  if(!file||!file.type.startsWith('image/'))return;
+  const st=$('st-'+side);st.className='status';st.textContent='Preparando imagen…';
+  let shr;try{shr=await shrink(file);}catch(e){st.className='status err';st.textContent='No pude abrir la imagen.';return;}
+  const drop=$('drop-'+side);drop.querySelectorAll('img').forEach(i=>i.remove());
+  const im=document.createElement('img');im.src=shr.url;drop.append(im);
+  const sample=await getSample();
+  if(!sample){return apiRead(side,shr.blob,st);}
+  try{const lim=await sample.limits();if(lim&&lim.images===false)throw {code:'noimg'};}catch(e){if(e&&e.code==='noimg'){st.className='status err';st.textContent='Este visor no permite leer imágenes: cargá los números a mano.';return;}}
+  st.textContent='Leyendo números de la foto…';
+  try{
+    const r=await sample(PROMPT,{images:[shr.blob],modelTier:'default'});
+    const m=(r.text||'').match(/\{[\s\S]*\}/);if(!m)throw new Error('sin JSON');
+    const d=JSON.parse(m[0]);
+    aplicarLectura(side,d,st);
+  }catch(e){
+    st.className='status err';
+    st.textContent=e&&e.code==='not_granted'?'No se dio permiso para leer la foto. Recargá la página, volvé a subirla y tocá "Permitir" cuando lo pregunte.':e&&e.code==='rate_limited'?'Demasiadas lecturas seguidas; esperá un momento y volvé a subirla.':'No pude leer bien la foto. Cargá los números a mano o probá con una foto más derecha y nítida.';
+  }
+}
+['e','s'].forEach(side=>{
+  const inp=$('file-'+side),drop=$('drop-'+side);
+  inp.onchange=()=>{handleFile(side,inp.files[0]);inp.value='';};
+  drop.addEventListener('dragover',e=>{e.preventDefault();drop.style.borderColor='#5b7bd5';});
+  drop.addEventListener('dragleave',()=>drop.style.borderColor='');
+  drop.addEventListener('drop',e=>{e.preventDefault();drop.style.borderColor='';handleFile(side,e.dataTransfer.files[0]);});
+});
+
+/* ---- Lectura con API de Anthropic (versión GitHub) ---- */
+const KKEY='numeros-dia-ss-apikey';
+function getKey(){try{return localStorage.getItem(KKEY)||''}catch(e){return ''}}
+function blobToB64(blob){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]);r.onerror=rej;r.readAsDataURL(blob);});}
+async function apiRead(side,blob,st){
+  const key=getKey();
+  if(!key){st.className='status err';st.textContent='Para leer fotos en esta compu cargá la clave de API en "Lectura de fotos" (arriba). Mientras, podés cargar los números a mano.';$('apiBox').open=true;return;}
+  st.className='status';st.textContent='Leyendo números de la foto…';
+  try{
+    const b64=await blobToB64(blob);
+    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-5-5',max_tokens:300,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},{type:'text',text:PROMPT}]}]})});
+    const j=await r.json();
+    if(!r.ok)throw new Error(r.status===401?'la clave de API no es válida':(j.error&&j.error.message)||('error '+r.status));
+    const txt=(j.content||[]).map(c=>c.text||'').join('');
+    const m=txt.match(/\{[\s\S]*\}/);if(!m)throw new Error('respuesta sin números');
+    aplicarLectura(side,JSON.parse(m[0]),st);
+  }catch(e){st.className='status err';st.textContent='No pude leer la foto ('+e.message+'). Cargá los números a mano.';}
+}
+function aplicarLectura(side,d,st){
+  ['sin','t7','t27','tdc','tdp'].forEach(k=>{S[side][k]=String(num(d[k]));});
+  save();refreshInputs();recalc();
+  const want=side==='e'?'entrada':'salida',modo=(d.modo||'').toLowerCase();
+  if(modo&&modo!==want){st.className='status err';st.textContent=`⚠ Números cargados, pero la foto parece ser de "${modo}" y la subiste como ${want}. Revisá.`;}
+  else{st.className='status ok';st.textContent=`✓ Leído (columna A verde): SIN ${d.sin} · 7: ${d.t7} · 27: ${d.t27} · TDC ${d.tdc} · TDP ${d.tdp}. Revisá que coincida.`;}
+}
+function bajar(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},2000);}
+
+/* ---- Salidas ---- */
+function texto(){
+  const {e:E,s:Sa}=window._C;
+  return `NÚMEROS ${fmtFecha(S.fecha)} – PASO SAN SEBASTIÁN
+INGRESOS: Pasajeros ${E.pax} · Tripulantes ${E.trip} · Vehículos ${E.vTot}
+EGRESOS: Pasajeros ${Sa.pax} · Tripulantes ${Sa.trip} · Vehículos ${Sa.vTot}
+TOTAL PERSONAS: Entrada ${E.total} · Salida ${Sa.total} · Día ${E.total+Sa.total}
+
+VEHÍCULOS (Ent / Sal)
+Auto ${E.vAuto} / ${Sa.vAuto}
+Bus ${E.vBus} / ${Sa.vBus}
+Camión ${E.vCam} / ${Sa.vCam}
+Total ${E.vTot} / ${Sa.vTot}
+
+PERSONAS (Ent / Sal)
+Auto ${E.pAuto} / ${Sa.pAuto}
+Bus ${E.pBus} / ${Sa.pBus}
+Camión ${E.pCam} / ${Sa.pCam}
+Otros ${E.pOtros} / ${Sa.pOtros}
+Total ${E.total} / ${Sa.total}`;
+}
+$('btnCopy').onclick=async()=>{
+  const t=texto(),out=$('txtOut');out.textContent=t;out.hidden=false;
+  try{await navigator.clipboard.writeText(t);$('stOut').className='status ok';$('stOut').textContent='✓ Texto copiado.';}
+  catch(e){$('stOut').className='status';$('stOut').textContent='No se pudo copiar automático: seleccioná el texto de abajo y copialo.';}
+};
+$('btnPng').onclick=async()=>{
+  const st=$('stOut');st.className='status';st.textContent='Generando imagen…';
+  try{
+    const canvas=await html2canvas($('gend'),{scale:2,backgroundColor:'#ffffff'});
+    const blob=await new Promise(r=>canvas.toBlob(r,'image/png'));
+    const dl=await (window.claude&&claude.use?claude.use('downloads'):null);
+    const name='Gendarmeria_'+fmtFecha(S.fecha).replace(/\//g,'-')+'.png';
+    if(dl){await dl.save({filename:name,data:blob});st.className='status ok';st.textContent='✓ Imagen lista.';}
+    else{bajar(blob,name);st.className='status ok';st.textContent='✓ Imagen descargada: '+name;}
+  }catch(e){st.className='status err';st.textContent='No se pudo generar la imagen ('+(e&&e.message||'error')+').';}
+};
+
+/* ---- Planilla estadístico mensual ---- */
+S.cfg=S.cfg||{tasaTdc:1000,tasaBus:6000};
+$('tasaTdc').value=S.cfg.tasaTdc;$('tasaBus').value=S.cfg.tasaBus;
+$('tasaTdc').oninput=e=>{S.cfg.tasaTdc=num(e.target.value);save();recalc();};
+$('tasaBus').oninput=e=>{S.cfg.tasaBus=num(e.target.value);save();recalc();};
+const MESES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+function fechaCorta(){if(!S.fecha)return'';const [y,m,d]=S.fecha.split('-');return d+'-'+MESES[num(m)-1];}
+function planRows(){
+  const {e:E,s:Sa}=window._C;const cfg=S.cfg||{tasaTdc:1000,tasaBus:6000};
+  const r=(label,f,money)=>({label,e:f(E),s:f(Sa),money});
+  return [
+    {h:true,label:'',cond:''},
+    r('VEHICULOS DE CARGA (TAA)',x=>x.camArgV),
+    r('VEHICULOS DE CARGA (TDC)',x=>x.camChi),
+    r('VEHICULOS DE PASAJEROS (TAA)',x=>x.arg.n),
+    r('VEHICULOS DE PASAJEROS (CHL)',x=>x.chi.n),
+    r('VEHICULOS PARTICULARES (AUTOS / MOTOS)',x=>x.vAuto),
+    {h:true,label:'MOV CANT PASAJEROS',cond:'CONDICION'},
+    r('CANTIDAD TRIPULANTES (TAA)',x=>x.camArgP+x.arg.t),
+    r('CANTIDAD TRIPULANTES (CHL)',x=>x.camChiP+x.chi.t),
+    r('CANTIDAD DE PASAJEROS (MICROS / OMNIBUS) (TAA)',x=>x.arg.p),
+    r('CANTIDAD DE PASAJEROS CHL',x=>x.chi.p),
+    r('VEHICULOS PARTICULARES (AUTOS / MOTOS)',x=>x.pAuto),
+    r('PEATONES',x=>x.pOtros),
+    {h:true,label:'TASAS',cond:'CONDICION'},
+    r('TRANSPORTES DE CARGA',x=>x.camChi*cfg.tasaTdc,true),
+    r('TRANSPORTES DE PASAJEROS',x=>x.chi.n*cfg.tasaBus,true)
+  ];
+}
+const money=v=>'$ '+v.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+function renderPlan(){
+  if(!window._C||!$('planTable'))return;
+  const fc=fechaCorta();let html='';
+  planRows().forEach(r=>{
+    if(r.h){html+=`<tr><th style="text-align:left">${r.label}</th><th>${r.cond}</th><th>${fc}</th></tr>`;return;}
+    html+=`<tr><td class="l" rowspan="2">${r.label}</td><td style="font-size:12px;font-weight:700">INGRESOS</td><td><b>${r.money?money(r.e):r.e}</b></td></tr>
+           <tr><td style="font-size:12px;font-weight:700">EGRESOS</td><td><b>${r.money?money(r.s):r.s}</b></td></tr>`;
+  });
+  $('planTable').innerHTML=html;
+}
+const _recalc=recalc;recalc=function(){_recalc();renderPlan();};
+
+$('btnCol').onclick=async()=>{
+  const fc=fechaCorta(),vals=[];
+  planRows().forEach(r=>{if(r.h)vals.push(fc);else vals.push(r.e,r.s);});
+  const st=$('stPlan');
+  try{await navigator.clipboard.writeText(vals.join('\n'));st.className='status ok';st.textContent='✓ Columna copiada ('+vals.length+' celdas). Pegala en la celda de la fecha.';}
+  catch(e){st.className='status';const out=$('txtOut');st.textContent='No se pudo copiar automático: seleccioná los valores del recuadro de la sección 5 y copialos.';out.hidden=false;out.textContent=vals.join('\n');}
+};
+
+async function buildXlsx(){
+  const wb=new ExcelJS.Workbook();const fc=fechaCorta();
+  const thin={style:'thin',color:{argb:'FF000000'}};const B={top:thin,left:thin,bottom:thin,right:thin};
+  const grey={type:'pattern',pattern:'solid',fgColor:{argb:'FFD9D9D9'}};
+  const ws=wb.addWorksheet('Planilla diaria');
+  ws.columns=[{width:48},{width:14},{width:16}];
+  let row=1;
+  planRows().forEach(r=>{
+    if(r.h){
+      const x=ws.getRow(row);x.values=[r.label,r.cond,fc];
+      x.eachCell({includeEmpty:true},c=>{c.font={bold:true};c.alignment={horizontal:'center',vertical:'middle'};c.border=B;c.fill=grey;});
+      row++;return;
+    }
+    const a=ws.getRow(row),b=ws.getRow(row+1);
+    a.values=[r.label,'INGRESOS',r.e];b.values=[null,'EGRESOS',r.s];
+    ws.mergeCells(row,1,row+1,1);
+    [a,b].forEach(x=>{for(let c=1;c<=3;c++){const cell=x.getCell(c);cell.border=B;cell.alignment={horizontal:'center',vertical:'middle',wrapText:true};}
+      x.getCell(2).font={bold:true,size:9};x.getCell(2).fill=grey;if(r.money)x.getCell(3).numFmt='"$" #,##0.00';});
+    row+=2;
+  });
+  // Hoja Gendarmería
+  const {e:E,s:Sa}=window._C;
+  const g=wb.addWorksheet('Gendarmería');
+  g.columns=[{width:14},{width:12},{width:12},{width:12},{width:12}];
+  g.mergeCells('A1:E1');g.getCell('A1').value='NÚMEROS PARA GENDARMERÍA';
+  g.mergeCells('A2:E2');g.getCell('A2').value='Paso San Sebastián (Ushuaia) · Fecha: '+fmtFecha(S.fecha);
+  const navy={type:'pattern',pattern:'solid',fgColor:{argb:'FF1F2A44'}},redF={type:'pattern',pattern:'solid',fgColor:{argb:'FFC62828'}};
+  ['A1','A2'].forEach(k=>{const c=g.getCell(k);c.fill=navy;c.font={bold:k==='A1',color:{argb:'FFFFFFFF'},size:k==='A1'?14:10};c.alignment={horizontal:'center'};});
+  g.mergeCells('B4:C4');g.mergeCells('D4:E4');g.getCell('B4').value='VEHÍCULOS';g.getCell('D4').value='PASAJEROS';
+  g.getRow(5).values=['','ENTRADA','SALIDA','ENTRADA','SALIDA'];
+  const data=[['AUTO',E.vAuto,Sa.vAuto,E.pAuto,Sa.pAuto],['BUS',E.vBus,Sa.vBus,E.pBus,Sa.pBus],['CAMIÓN',E.vCam,Sa.vCam,E.pCam,Sa.pCam],
+    ['OTROS',null,null,E.pOtros||null,Sa.pOtros||null],['TOTAL',E.vTot,Sa.vTot,E.total,Sa.total]];
+  data.forEach((d,i)=>g.getRow(6+i).values=d);
+  for(let r=4;r<=10;r++)for(let c=1;c<=5;c++){const cell=g.getRow(r).getCell(c);cell.border=B;cell.alignment={horizontal:c===1?'left':'center'};
+    if(r<=5){cell.fill=navy;cell.font={bold:true,color:{argb:'FFFFFFFF'}};}
+    else if(r===10){cell.fill=redF;cell.font={bold:true,color:{argb:'FFFFFFFF'}};}
+    else cell.font={bold:true};}
+  // Hoja ingresos/egresos
+  const ie=wb.addWorksheet('Ingresos-Egresos');
+  ie.columns=[{width:22},{width:14},{width:14}];
+  ie.addRows([['',"INGRESOS","EGRESOS"],['PASAJEROS',E.pax,Sa.pax],['TRIPULANTES',E.trip,Sa.trip],['VEHÍCULOS',E.vTot,Sa.vTot],[],
+    ['TOTAL PERSONAS',"PERSONAS"],['ENTRADA',E.total],['SALIDA',Sa.total],['TOTAL DEL DÍA',E.total+Sa.total]]);
+  [1,6].forEach(r=>ie.getRow(r).eachCell(c=>{c.fill=navy;c.font={bold:true,color:{argb:'FFFFFFFF'}};}));
+  ie.eachRow(r=>r.eachCell(c=>{c.border=B;}));
+  const buf=await wb.xlsx.writeBuffer();
+  return new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+$('btnXlsx').onclick=async()=>{
+  const st=$('stPlan');st.className='status';st.textContent='Generando Excel…';
+  try{
+    if(!window.ExcelJS)throw new Error('no cargó la librería de Excel');
+    const blob=await buildXlsx();
+    const name='Planilla_SanSebastian_'+fmtFecha(S.fecha).replace(/\//g,'-')+'.xlsx';
+    const dl=await (window.claude&&claude.use?claude.use('downloads'):null);
+    if(!dl){bajar(blob,name);st.className='status ok';st.textContent='✓ Excel descargado: '+name;return;}
+    await dl.save({filename:name,data:blob});st.className='status ok';st.textContent='✓ Excel listo: '+name;
+  }catch(e){st.className='status err';st.textContent='No se pudo generar el Excel ('+(e&&e.message||e&&e.code||'error')+').';}
+};
+
+$('apiKey').value=getKey()?'••••••••••••':'';$('apiSt').textContent=getKey()?'Clave guardada en este navegador.':'Sin clave cargada.';
+$('apiSave').onclick=()=>{const v=$('apiKey').value.trim();if(!v||v.startsWith('••'))return;try{localStorage.setItem(KKEY,v);$('apiSt').className='status ok';$('apiSt').textContent='✓ Clave guardada en este navegador.';$('apiKey').value='••••••••••••';}catch(e){$('apiSt').textContent='No se pudo guardar.';}};
+$('apiDel').onclick=()=>{try{localStorage.removeItem(KKEY)}catch(e){};$('apiKey').value='';$('apiSt').className='status';$('apiSt').textContent='Clave borrada.';};
+
+buildSicam();buildVeh();buildBus();
+</script>
+</body>
+</html>
