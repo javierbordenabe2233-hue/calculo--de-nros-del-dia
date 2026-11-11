@@ -252,7 +252,7 @@ function buildBus(){
     ci.onchange=()=>{let n=Math.max(0,Math.min(60,num(ci.value)));while(list.length<n)list.push({p:'',t:''});list.length=n;save();buildBus();recalc();};
     c.append(ci);head.append(c);box.append(head);
     const t=document.createElement('table');t.className='mini';
-    t.innerHTML=`<thead><tr><th>#</th><th>Pasajeros</th><th>Tripulantes</th></tr></thead>`;
+    t.innerHTML=`<thead><tr><th>#</th><th>Pasajeros<br><small style="font-weight:400">(con tripulantes)</small></th><th>Tripulantes</th></tr></thead>`;
     const tb=document.createElement('tbody');
     list.forEach((b,ix)=>{
       const tr=document.createElement('tr');tr.innerHTML=`<td>${ix+1}</td><td></td><td></td>`;
@@ -272,7 +272,8 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;do
 /* ---- Cálculo ---- */
 function calc(side){
   const x=S[side];
-  const busSum=o=>x.bus[o].reduce((a,b)=>({n:a.n+1,p:a.p+num(b.p),t:a.t+num(b.t)}),{n:0,p:0,t:0});
+  // En cada colectivo, 'Pasajeros' se carga CON los tripulantes incluidos: tot = cargado, p = tot - tripulantes
+  const busSum=o=>{const r=x.bus[o].reduce((a,b)=>({n:a.n+1,tot:a.tot+num(b.p),t:a.t+num(b.t)}),{n:0,tot:0,t:0});r.p=r.tot-r.t;return r;};
   const chi=busSum('chi'),arg=busSum('arg');
   const pAuto=num(x.sin),pBus=num(x.t27)+num(x.tdp),pCam=num(x.t7)+num(x.tdc),pOtros=num(x.cami);
   const total=pAuto+pBus+pCam+pOtros;
@@ -287,12 +288,12 @@ function recalc(){
   const E=calc('e'),Sa=calc('s'),C={e:E,s:Sa};
   // footers colectivos
   const cur=C[tab];
-  ['chi','arg'].forEach(o=>{const f=$('foot-'+o);if(f){const v=cur[o];f.innerHTML=`<tr><td>CANT ${v.n}</td><td>PAX ${v.p}</td><td>TRIP ${v.t}</td></tr>`;}});
+  ['chi','arg'].forEach(o=>{const f=$('foot-'+o);if(f){const v=cur[o];f.innerHTML=`<tr><td>CANT ${v.n}</td><td>PAX ${v.tot}<br><small>${v.p} sin trip.</small></td><td>TRIP ${v.t}</td></tr>`;}});
   const bc=$('busCheck');
-  const sic=cur.pBus,grid=cur.busPax+cur.busTrip;
+  const sic=cur.pBus,grid=cur.chi.tot+cur.arg.tot;
   if(cur.busN===0&&sic===0)bc.innerHTML='';
-  else if(sic===grid)bc.innerHTML=`<div class="check ok">✓ Personas en colectivos (pax + trip) = ${grid}, coincide con S.I.Ca.M. (TDP + TAA 27 = ${sic}).</div>`;
-  else bc.innerHTML=`<div class="check bad">⚠ La grilla suma ${grid} personas (pax ${cur.busPax} + trip ${cur.busTrip}) y el S.I.Ca.M. marca ${sic} en colectivos (TDP + TAA 27). Diferencia: ${grid-sic>0?'+':''}${grid-sic}.</div>`;
+  else if(sic===grid)bc.innerHTML=`<div class="check ok">✓ Personas en colectivos = ${grid} (${cur.busPax} pasajeros + ${cur.busTrip} tripulantes), coincide con S.I.Ca.M. (TDP + TAA 27 = ${sic}).</div>`;
+  else bc.innerHTML=`<div class="check bad">⚠ La grilla suma ${grid} personas (${cur.busPax} pasajeros + ${cur.busTrip} tripulantes) y el S.I.Ca.M. marca ${sic} en colectivos (TDP + TAA 27). Diferencia: ${grid-sic>0?'+':''}${grid-sic}.</div>`;
 
   $('ieTable').innerHTML=`
    <thead><tr><th style="text-align:left"></th><th>INGRESOS</th><th>EGRESOS</th></tr></thead>
@@ -313,8 +314,8 @@ function recalc(){
    miniBox('CAMIONES ARGENTINOS',[['Entrada',E.camArgP,E.camArgV],['Salida',Sa.camArgP,Sa.camArgV]])+
    miniBox('CAMIONES CHILENOS',[['Entrada',E.camChiP,E.camChi],['Salida',Sa.camChiP,Sa.camChi]])+
    miniBox('PARTICULARES',[['Entrada',E.pAuto,E.vAuto],['Salida',Sa.pAuto,Sa.vAuto]])+
-   miniBox('COLECTIVOS CHILE',[['Entrada',E.chi.p+' + '+E.chi.t+' trip',E.chi.n],['Salida',Sa.chi.p+' + '+Sa.chi.t+' trip',Sa.chi.n]])+
-   miniBox('COLECTIVOS ARG',[['Entrada',E.arg.p+' + '+E.arg.t+' trip',E.arg.n],['Salida',Sa.arg.p+' + '+Sa.arg.t+' trip',Sa.arg.n]])+
+   miniBox('COLECTIVOS CHILE',[['Entrada',E.chi.p+' pax + '+E.chi.t+' trip',E.chi.n],['Salida',Sa.chi.p+' pax + '+Sa.chi.t+' trip',Sa.chi.n]])+
+   miniBox('COLECTIVOS ARG',[['Entrada',E.arg.p+' pax + '+E.arg.t+' trip',E.arg.n],['Salida',Sa.arg.p+' pax + '+Sa.arg.t+' trip',Sa.arg.n]])+
    `<div><table class="mini"><thead><tr><th colspan="2">CAMINANTES</th></tr></thead><tbody><tr><td class="l">Entrada</td><td><b>${E.pOtros}</b></td></tr><tr><td class="l">Salida</td><td><b>${Sa.pOtros}</b></td></tr></tbody></table></div>`;
 
   const b=v=>v===0?'':v;
