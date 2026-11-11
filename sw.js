@@ -1,5 +1,5 @@
 // Service worker: permite instalar la app y abrirla sin conexión.
-const CACHE = 'numeros-ss-v3';
+const CACHE = 'numeros-ss-v4';
 const LOCAL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 const CDN = [
   'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',

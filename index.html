@@ -414,30 +414,57 @@ function prepOcr(blob){
     img.onerror=rej;img.src=URL.createObjectURL(blob);});
 }
 function despues(L,re){const m=L.match(re);if(!m)return[];return (L.slice(m.index+m[0].length).match(/\d+/g)||[]).map(Number);}
+// Une dígitos que el lector separó dentro de una misma celda (ej. "1 1" -> "11")
+function textoDeLineas(data){
+  if(!data.lines||!data.lines.length)return data.text||'';
+  return data.lines.map(l=>{
+    let s='',prev=null;
+    (l.words||[]).forEach(w=>{
+      const t=(w.text||'').replace(/[|]/g,'').trim();if(!t){prev=null;return;}
+      const alto=(w.bbox.y1-w.bbox.y0)||10;
+      if(prev&&/^\d+$/.test(t)&&/^\d+$/.test(prev.t)&&(w.bbox.x0-prev.x1)<alto*0.6)s+=t;
+      else s+=(s?' ':'')+t;
+      prev={t,x1:w.bbox.x1};
+    });
+    return s;
+  }).join('\n');
+}
+// Total = A + D + S + R + C (+ otras): si no cierra, la fila es dudosa
+const cierra=n=>n.length>=2&&n[0]===n.slice(1).reduce((a,b)=>a+b,0);
 function parseOcr(text){
-  const out={},taa=[];
+  const out={},dud=[],taa=[];
   text.split('\n').forEach(raw=>{
     const L=raw.toUpperCase().replace(/[|\[\]{}()]/g,' ');
     let n;
-    if(/PARTICULAR/.test(L)&&(n=despues(L,/\bS[I1L]N\b/)).length>=2){out.sin=n[1];return;}
-    if(/CARGA/.test(L)&&(n=despues(L,/\bT[DO0]C\b/)).length>=2){out.tdc=n[1];return;}
-    if(/PASAJ/.test(L)&&(n=despues(L,/\bT[DO0]P\b/)).length>=2){out.tdp=n[1];return;}
+    const set=(k,arr)=>{out[k]=arr[1];if(!cierra(arr))dud.push(k);};
+    if(/PARTICULAR/.test(L)&&(n=despues(L,/\bS[I1L]N\b/)).length>=2){set('sin',n);return;}
+    if(/CARGA/.test(L)&&(n=despues(L,/\bT[DO0]C\b/)).length>=2){set('tdc',n);return;}
+    if(/PASAJ/.test(L)&&(n=despues(L,/\bT[DO0]P\b/)).length>=2){set('tdp',n);return;}
     if(/TRANSIT|ARGENT/.test(L)&&(n=despues(L,/ARGENT[A-Z]*(?!.*ARGENT)/)).length>=3)taa.push(n);
   });
-  taa.forEach((n,i)=>{const k=n[0]===27?'t27':n[0]===7?'t7':(i===0?'t7':'t27');out[k]=n[2];});
-  return out;
+  taa.forEach((n,i)=>{const k=n[0]===27?'t27':n[0]===7?'t7':(i===0?'t7':'t27');out[k]=n[2];if(!cierra(n.slice(1)))dud.push(k);});
+  out._dud=dud;return out;
+}
+
+function marcarDudosos(side,keys){
+  document.querySelectorAll(`input.n[data-side="${side}"]`).forEach(i=>{
+    const bad=keys.includes(i.dataset.key);i.style.background=bad?'#fff4e0':'';i.style.borderColor=bad?'var(--warn)':'';
+    if(bad)i.addEventListener('input',()=>{i.style.background='';i.style.borderColor='';},{once:true});
+  });
 }
 async function ocrLocal(side,blob,st){
   try{
     st.className='status';st.textContent='Cargando lector (la primera vez tarda unos segundos)…';
     await loadTess();const canvas=await prepOcr(blob);
     const r=await Tesseract.recognize(canvas,'eng',{tessedit_pageseg_mode:'6',logger:m=>{if(m.status==='recognizing text')st.textContent='Leyendo la captura… '+Math.round(m.progress*100)+'%';}});
-    const d=parseOcr(r.data.text);const keys=['sin','t7','t27','tdc','tdp'];const got=keys.filter(k=>d[k]!==undefined);
+    const d=parseOcr(textoDeLineas(r.data));const keys=['sin','t7','t27','tdc','tdp'];const got=keys.filter(k=>d[k]!==undefined);
     if(!got.length)throw new Error('no encontré la tabla');
     got.forEach(k=>S[side][k]=String(d[k]));save();refreshInputs();recalc();
     const nom={sin:'SIN',t7:'7',t27:'27',tdc:'TDC',tdp:'TDP'};const falt=keys.filter(k=>d[k]===undefined).map(k=>nom[k]);
-    st.className=falt.length?'status err':'status ok';
-    st.textContent=(falt.length?'⚠ Leí parte de la captura; faltan: '+falt.join(', ')+'. Completalos a mano. ':'✓ Leído (columna A verde): '+keys.map(k=>nom[k]+' '+d[k]).join(' · ')+'. ')+'Revisá que coincida.';
+    const dud=(d._dud||[]).filter(k=>d[k]!==undefined).map(k=>nom[k]);
+    marcarDudosos(side,d._dud||[]);
+    st.className=(falt.length||dud.length)?'status err':'status ok';
+    st.textContent=(dud.length?'⚠ Revisá '+dud.join(', ')+': en esa fila el Total no coincide con la suma de las columnas, puede estar mal leído. ':'')+(falt.length?'⚠ Leí parte de la captura; faltan: '+falt.join(', ')+'. Completalos a mano. ':'✓ Leído (columna A verde): '+keys.map(k=>nom[k]+' '+d[k]).join(' · ')+'. ')+'Revisá que coincida.';
   }catch(e){st.className='status err';st.textContent='No pude leer la imagen ('+e.message+'). Este lector gratis funciona con capturas de pantalla, no con fotos del monitor. Para fotos cargá la clave de API en "Lectura de fotos", o cargá los números a mano.';}
 }
 
