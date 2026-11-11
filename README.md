@@ -10,8 +10,9 @@ App web (una sola página, `index.html`) para armar los números diarios del Pas
 5. Grilla para Gendarmería, que se descarga como imagen o se copia como texto.
 6. Planilla estadístico mensual, que se descarga como Excel (.xlsx) o se copia como columna para pegar en el Excel mensual.
 
-## Lectura de fotos
-En esta versión las fotos se leen con una clave de API de Anthropic, que se carga en la sección "Lectura de fotos". La clave queda guardada solo en el navegador de cada compu y nunca se sube al repositorio. Sin clave, los números se cargan a mano.
+## Lectura de imágenes
+- **Capturas de pantalla** (Impr Pant, Win+Shift+S): se leen gratis, sin clave, con un lector que funciona dentro del navegador. Se pueden pegar con Ctrl+V o con el botón "Pegar captura".
+- **Fotos del monitor** (celular): necesitan una clave de API de Anthropic, que se carga en "Lectura de fotos". Si hay clave cargada, se usa para todas las imágenes. La clave queda guardada solo en el navegador de cada compu y nunca se sube al repositorio.
 
 Los datos del día se guardan en el navegador de cada compu.
 

@@ -89,19 +89,21 @@ pre{white-space:pre-wrap;background:#f6f7f9;border:1px solid var(--line);border-
     <div class="grid2">
       <div data-side="e">
         <span class="side-title t-e">ENTRADA</span>
-        <label class="drop" id="drop-e"><input type="file" accept="image/*" hidden id="file-e"><span class="lbl">Subir foto de ENTRADA</span><span class="hint">Tocá para elegir o arrastrá la imagen</span></label>
+        <label class="drop" id="drop-e"><input type="file" accept="image/*" hidden id="file-e"><span class="lbl">Subir foto de ENTRADA</span><span class="hint">Foto o captura de pantalla · tocá, arrastrá o pegá con Ctrl+V</span></label>
+        <button class="sec" data-paste="e" style="margin-top:6px;font-size:13px;padding:5px 10px">📋 Pegar captura de entrada</button>
         <div class="status" id="st-e"></div>
       </div>
       <div data-side="s">
         <span class="side-title t-s">SALIDA</span>
-        <label class="drop" id="drop-s"><input type="file" accept="image/*" hidden id="file-s"><span class="lbl">Subir foto de SALIDA</span><span class="hint">Tocá para elegir o arrastrá la imagen</span></label>
+        <label class="drop" id="drop-s"><input type="file" accept="image/*" hidden id="file-s"><span class="lbl">Subir foto de SALIDA</span><span class="hint">Foto o captura de pantalla · tocá, arrastrá o pegá con Ctrl+V</span></label>
+        <button class="sec" data-paste="s" style="margin-top:6px;font-size:13px;padding:5px 10px">📋 Pegar captura de salida</button>
         <div class="status" id="st-s"></div>
       </div>
     </div>
     <p class="note" id="ocrNote">Al subir cada foto, la app lee la columna verde <b>A (Aceptados)</b> y completa la tabla de abajo. Revisá siempre los números: podés corregirlos a mano.</p>
 
     <details id="apiBox" style="margin-top:10px;font-size:13px"><summary style="cursor:pointer;font-weight:600">Lectura de fotos (clave de API)</summary>
-      <p class="note">En esta versión las fotos se leen con una clave de API de Anthropic (console.anthropic.com). La clave queda guardada solo en este navegador, no en GitHub. Cada lectura usa crédito de esa cuenta.</p>
+      <p class="note">Las <b>capturas de pantalla</b> se leen gratis sin clave. Las <b>fotos del monitor</b> necesitan una clave de API de Anthropic (console.anthropic.com). La clave queda guardada solo en este navegador, no en GitHub. Cada lectura usa crédito de esa cuenta.</p>
       <div class="row"><input type="password" id="apiKey" placeholder="sk-ant-..." style="flex:1;min-width:200px;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px"><button class="sec" id="apiSave">Guardar</button><button class="sec" id="apiDel">Borrar</button></div>
       <div class="status" id="apiSt"></div>
     </details>
@@ -373,7 +375,7 @@ async function handleFile(side,file){
   const drop=$('drop-'+side);drop.querySelectorAll('img').forEach(i=>i.remove());
   const im=document.createElement('img');im.src=shr.url;drop.append(im);
   const sample=await getSample();
-  if(!sample){return apiRead(side,shr.blob,st);}
+  if(!sample){return getKey()?apiRead(side,shr.blob,st):ocrLocal(side,file,st);}
   try{const lim=await sample.limits();if(lim&&lim.images===false)throw {code:'noimg'};}catch(e){if(e&&e.code==='noimg'){st.className='status err';st.textContent='Este visor no permite leer imágenes: cargá los números a mano.';return;}}
   st.textContent='Leyendo números de la foto…';
   try{
@@ -394,13 +396,55 @@ async function handleFile(side,file){
   drop.addEventListener('drop',e=>{e.preventDefault();drop.style.borderColor='';handleFile(side,e.dataTransfer.files[0]);});
 });
 
+
+/* ---- Lectura local gratis (capturas de pantalla) ---- */
+let tessLoad=null;
+function loadTess(){
+  if(window.Tesseract)return Promise.resolve();
+  if(!tessLoad)tessLoad=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=res;s.onerror=()=>{tessLoad=null;rej(new Error('no se pudo cargar el lector; revisá la conexión'));};document.head.append(s);});
+  return tessLoad;
+}
+function prepOcr(blob){
+  return new Promise((res,rej)=>{const img=new Image();img.onload=()=>{
+    const sc=Math.min(3,Math.max(1.5,2400/img.width));const c=document.createElement('canvas');c.width=img.width*sc;c.height=img.height*sc;
+    const x=c.getContext('2d');x.imageSmoothingQuality='high';x.filter='grayscale(1) contrast(1.4)';x.drawImage(img,0,0,c.width,c.height);res(c);};
+    img.onerror=rej;img.src=URL.createObjectURL(blob);});
+}
+function despues(L,re){const m=L.match(re);if(!m)return[];return (L.slice(m.index+m[0].length).match(/\d+/g)||[]).map(Number);}
+function parseOcr(text){
+  const out={},taa=[];
+  text.split('\n').forEach(raw=>{
+    const L=raw.toUpperCase().replace(/[|\[\]{}()]/g,' ');
+    let n;
+    if(/PARTICULAR/.test(L)&&(n=despues(L,/\bS[I1L]N\b/)).length>=2){out.sin=n[1];return;}
+    if(/CARGA/.test(L)&&(n=despues(L,/\bT[DO0]C\b/)).length>=2){out.tdc=n[1];return;}
+    if(/PASAJ/.test(L)&&(n=despues(L,/\bT[DO0]P\b/)).length>=2){out.tdp=n[1];return;}
+    if(/TRANSIT|ARGENT/.test(L)&&(n=despues(L,/ARGENT[A-Z]*(?!.*ARGENT)/)).length>=3)taa.push(n);
+  });
+  taa.forEach((n,i)=>{const k=n[0]===27?'t27':n[0]===7?'t7':(i===0?'t7':'t27');out[k]=n[2];});
+  return out;
+}
+async function ocrLocal(side,blob,st){
+  try{
+    st.className='status';st.textContent='Cargando lector (la primera vez tarda unos segundos)…';
+    await loadTess();const canvas=await prepOcr(blob);
+    const r=await Tesseract.recognize(canvas,'eng',{tessedit_pageseg_mode:'6',logger:m=>{if(m.status==='recognizing text')st.textContent='Leyendo la captura… '+Math.round(m.progress*100)+'%';}});
+    const d=parseOcr(r.data.text);const keys=['sin','t7','t27','tdc','tdp'];const got=keys.filter(k=>d[k]!==undefined);
+    if(!got.length)throw new Error('no encontré la tabla');
+    got.forEach(k=>S[side][k]=String(d[k]));save();refreshInputs();recalc();
+    const nom={sin:'SIN',t7:'7',t27:'27',tdc:'TDC',tdp:'TDP'};const falt=keys.filter(k=>d[k]===undefined).map(k=>nom[k]);
+    st.className=falt.length?'status err':'status ok';
+    st.textContent=(falt.length?'⚠ Leí parte de la captura; faltan: '+falt.join(', ')+'. Completalos a mano. ':'✓ Leído (columna A verde): '+keys.map(k=>nom[k]+' '+d[k]).join(' · ')+'. ')+'Revisá que coincida.';
+  }catch(e){st.className='status err';st.textContent='No pude leer la imagen ('+e.message+'). Este lector gratis funciona con capturas de pantalla, no con fotos del monitor. Para fotos cargá la clave de API en "Lectura de fotos", o cargá los números a mano.';}
+}
+
 /* ---- Lectura con API de Anthropic (versión GitHub) ---- */
 const KKEY='numeros-dia-ss-apikey';
 function getKey(){try{return localStorage.getItem(KKEY)||''}catch(e){return ''}}
 function blobToB64(blob){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]);r.onerror=rej;r.readAsDataURL(blob);});}
 async function apiRead(side,blob,st){
   const key=getKey();
-  if(!key){st.className='status err';st.textContent='Para leer fotos en esta compu cargá la clave de API en "Lectura de fotos" (arriba). Mientras, podés cargar los números a mano.';$('apiBox').open=true;return;}
+  if(!key)return ocrLocal(side,blob,st);
   st.className='status';st.textContent='Leyendo números de la foto…';
   try{
     const b64=await blobToB64(blob);
@@ -589,6 +633,24 @@ btnI.onclick=async()=>{
     ?'En iPhone/iPad: abrí esta página en <b>Safari</b>, tocá el botón <b>Compartir</b> (cuadrado con flecha) y elegí <b>"Agregar a pantalla de inicio"</b>.'
     :'Si no aparece la ventana para instalar: en <b>Chrome o Edge</b> tocá el menú <b>⋮</b> (o <b>…</b>) y elegí <b>"Instalar app"</b> / <b>"Agregar a pantalla principal"</b>. En la compu también aparece un ícono de instalar a la derecha de la barra de direcciones.';
 };
+
+/* ---- Pegar captura (Ctrl+V) ---- */
+let pasteSide=null;
+['e','s'].forEach(sd=>{$('drop-'+sd).addEventListener('click',()=>pasteSide=sd);});
+document.querySelectorAll('[data-paste]').forEach(b=>b.onclick=async()=>{
+  const sd=b.dataset.paste;pasteSide=sd;const st=$('st-'+sd);
+  try{
+    const items=await navigator.clipboard.read();
+    for(const it of items){const t=it.types.find(x=>x.startsWith('image/'));if(t){const bl=await it.getType(t);return handleFile(sd,new File([bl],'captura.png',{type:t}));}}
+    st.className='status err';st.textContent='No hay ninguna imagen copiada. Hacé la captura (Impr Pant o Win+Shift+S) y volvé a tocar el botón.';
+  }catch(e){st.className='status';st.textContent='Ahora apretá Ctrl+V para pegar la captura de '+(sd==='e'?'entrada':'salida')+'.';}
+});
+document.addEventListener('paste',e=>{
+  if(e.target&&e.target.tagName==='INPUT')return;
+  const f=[...(e.clipboardData&&e.clipboardData.files||[])].find(x=>x.type.startsWith('image/'));
+  if(!f)return;e.preventDefault();
+  const sd=pasteSide||(S.e.sin===''?'e':'s');handleFile(sd,f);pasteSide=null;
+});
 
 buildSicam();buildVeh();buildBus();
 </script>
