@@ -14,3 +14,6 @@ App web (una sola página, `index.html`) para armar los números diarios del Pas
 En esta versión las fotos se leen con una clave de API de Anthropic, que se carga en la sección "Lectura de fotos". La clave queda guardada solo en el navegador de cada compu y nunca se sube al repositorio. Sin clave, los números se cargan a mano.
 
 Los datos del día se guardan en el navegador de cada compu.
+
+## Instalar
+Con el botón **⬇ Instalar app** (arriba de todo) se instala en la compu o en el celular (Chrome, Edge o Android). En iPhone/iPad: Safari → Compartir → "Agregar a pantalla de inicio". Instalada, se abre en su propia ventana y funciona sin conexión, salvo la lectura de fotos.

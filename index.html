@@ -3,6 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1f2a44">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Números SS">
 <title>Números del día · Paso San Sebastián</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
@@ -71,7 +77,8 @@ pre{white-space:pre-wrap;background:#f6f7f9;border:1px solid var(--line);border-
 <body>
 <header>
   <h1>Números del día · Paso San Sebastián</h1>
-  <div class="sub">Fecha <input type="date" id="fecha"> <button class="sec" id="btnReset" style="padding:4px 10px;font-size:13px">Nuevo día (borrar)</button></div>
+  <div class="sub">Fecha <input type="date" id="fecha"> <button class="sec" id="btnReset" style="padding:4px 10px;font-size:13px">Nuevo día (borrar)</button> <button class="red" id="btnInstall" hidden style="padding:4px 12px;font-size:13px;border-color:#fff">⬇ Instalar app</button></div>
+  <div id="installHelp" hidden style="margin-top:8px;font-size:13px;background:#fff;color:var(--ink);border-radius:8px;padding:8px 10px"></div>
 </header>
 <main>
 
@@ -565,6 +572,23 @@ $('btnXlsx').onclick=async()=>{
 $('apiKey').value=getKey()?'••••••••••••':'';$('apiSt').textContent=getKey()?'Clave guardada en este navegador.':'Sin clave cargada.';
 $('apiSave').onclick=()=>{const v=$('apiKey').value.trim();if(!v||v.startsWith('••'))return;try{localStorage.setItem(KKEY,v);$('apiSt').className='status ok';$('apiSt').textContent='✓ Clave guardada en este navegador.';$('apiKey').value='••••••••••••';}catch(e){$('apiSt').textContent='No se pudo guardar.';}};
 $('apiDel').onclick=()=>{try{localStorage.removeItem(KKEY)}catch(e){};$('apiKey').value='';$('apiSt').className='status';$('apiSt').textContent='Clave borrada.';};
+
+/* ---- Instalar (PWA) ---- */
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+let installEvt=null;
+const instalada=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+const esIOS=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const btnI=$('btnInstall'),help=$('installHelp');
+if(!instalada())btnI.hidden=false;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;btnI.hidden=false;});
+window.addEventListener('appinstalled',()=>{btnI.hidden=true;help.hidden=false;help.textContent='✓ App instalada. Ya la podés abrir desde el escritorio o la pantalla de inicio.';});
+btnI.onclick=async()=>{
+  if(installEvt){installEvt.prompt();const r=await installEvt.userChoice;installEvt=null;if(r.outcome==='accepted')btnI.hidden=true;return;}
+  help.hidden=!help.hidden;
+  help.innerHTML=esIOS
+    ?'En iPhone/iPad: abrí esta página en <b>Safari</b>, tocá el botón <b>Compartir</b> (cuadrado con flecha) y elegí <b>"Agregar a pantalla de inicio"</b>.'
+    :'Si no aparece la ventana para instalar: en <b>Chrome o Edge</b> tocá el menú <b>⋮</b> (o <b>…</b>) y elegí <b>"Instalar app"</b> / <b>"Agregar a pantalla principal"</b>. En la compu también aparece un ícono de instalar a la derecha de la barra de direcciones.';
+};
 
 buildSicam();buildVeh();buildBus();
 </script>
